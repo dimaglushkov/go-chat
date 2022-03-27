@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package chat;
+option go_package = "./chat";
+
+message RoomPort {
+  int32 port = 1;
+  bool exists = 2;
+}
+
+message RoomName {
+  string name = 1;
+}
+
+service Butler {
+  rpc CreateRoom(RoomName) returns (RoomPort) {}
+  rpc FindRoom(RoomName) returns (RoomPort) {}
+}

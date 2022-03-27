@@ -1,4 +1,4 @@
-package main
+package chat
 
 import (
 	"bufio"
@@ -6,8 +6,6 @@ import (
 	"log"
 	"net"
 )
-
-const roomSize = 20
 
 type message struct {
 	sender, text string
@@ -25,37 +23,37 @@ type client struct {
 	messages   chan message
 }
 
-type Room struct {
-	sema     chan interface{}
+type room struct {
+	sema     chan any
 	messages chan message
 	toEnter  chan client
 	toLeave  chan client
 
 	listener net.Listener
 	clients  map[client]bool
-	close    chan interface{}
+	close    chan any
 }
 
-func NewRoom() (r Room, err error) {
-	r = Room{}
+func newRoom(roomSize int) (r room, err error) {
+	r = room{}
 	r.listener, err = net.Listen("tcp", ":0")
 	if err != nil {
 		return
 	}
 	r.clients = make(map[client]bool, roomSize)
-	r.sema = make(chan interface{}, roomSize)
+	r.sema = make(chan any, roomSize)
 	r.messages = make(chan message)
 	r.toEnter = make(chan client)
 	r.toLeave = make(chan client)
-	r.close = make(chan interface{})
+	r.close = make(chan any)
 	return
 }
 
-func (r *Room) GetPort() int {
+func (r *room) getPort() int {
 	return r.listener.Addr().(*net.TCPAddr).Port
 }
 
-func (r *Room) Open() {
+func (r *room) Open() {
 	go r.roomMonitor()
 
 	for {
@@ -68,13 +66,12 @@ func (r *Room) Open() {
 				log.Print(err)
 				continue
 			}
-
 		}
 		go r.handleConn(conn)
 	}
 }
 
-func (r *Room) roomMonitor() {
+func (r *room) roomMonitor() {
 	for {
 		select {
 		case msg := <-r.messages:
@@ -111,7 +108,9 @@ func (r *Room) roomMonitor() {
 	}
 }
 
-func (r *Room) handleConn(conn net.Conn) {
+func (r *room) handleConn(conn net.Conn) {
+	r.sema <- struct{}{}
+	defer func() { <-r.sema }()
 	defer conn.Close()
 
 	input := bufio.NewScanner(conn)
@@ -130,7 +129,7 @@ func (r *Room) handleConn(conn net.Conn) {
 	r.toLeave <- cl
 }
 
-func (r *Room) messageWriter(conn net.Conn, cl client) {
+func (r *room) messageWriter(conn net.Conn, cl client) {
 	for {
 		select {
 		case msg := <-cl.messages:
@@ -139,17 +138,4 @@ func (r *Room) messageWriter(conn net.Conn, cl client) {
 			return
 		}
 	}
-}
-
-func run() {
-	cr, err := NewRoom()
-	if err != nil {
-		log.Fatalln(err)
-	}
-	log.Println(cr.GetPort())
-	cr.Open()
-}
-
-func main() {
-	run()
 }

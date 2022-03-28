@@ -1,6 +1,7 @@
 package chat
 
 import (
+	"fmt"
 	"golang.org/x/net/context"
 	"log"
 	"sync"
@@ -27,6 +28,9 @@ func (b *Butler) CreateRoom(ctx context.Context, roomNameSize *RoomNameSize) (*R
 		roomSize = int(roomNameSize.Size)
 	}
 
+	if _, ok := b.rooms[roomNameSize.Name]; ok {
+		return nil, fmt.Errorf("room \"%s\" already exists", roomNameSize.Name)
+	}
 	cr, err := newRoom(roomSize)
 	if err != nil {
 		return &RoomPort{Port: 0, Exists: false}, err

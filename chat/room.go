@@ -21,6 +21,7 @@ func (msg message) String() string {
 type client struct {
 	name, addr string
 	messages   chan message
+	done       chan struct{}
 }
 
 type room struct {
@@ -88,8 +89,8 @@ func (r *room) roomMonitor() {
 			}
 
 		case cl := <-r.toLeave:
-			delete(r.clients, cl)
 			close(cl.messages)
+			delete(r.clients, cl)
 
 			leaveMsg := message{text: cl.name + " left"}
 			for cli := range r.clients {
@@ -102,6 +103,7 @@ func (r *room) roomMonitor() {
 				if err != nil {
 					log.Println(err)
 				}
+				log.Printf("Room at port %d is empty, closing it", r.getPort())
 				return
 			}
 		}
@@ -113,11 +115,11 @@ func (r *room) handleConn(conn net.Conn) {
 	defer func() { <-r.sema }()
 	defer conn.Close()
 
-	log.Printf("Somebody is trying to join room at port %d", r.getPort())
 	input := bufio.NewScanner(conn)
 	cl := client{}
 	cl.addr = conn.RemoteAddr().String()
 	cl.messages = make(chan message)
+	cl.done = make(chan struct{})
 	input.Scan()
 	cl.name = input.Text()
 
@@ -127,6 +129,7 @@ func (r *room) handleConn(conn net.Conn) {
 	for input.Scan() {
 		r.messages <- message{sender: cl.name, text: input.Text()}
 	}
+	close(cl.done)
 	r.toLeave <- cl
 }
 
@@ -135,7 +138,7 @@ func (r *room) messageWriter(conn net.Conn, cl client) {
 		select {
 		case msg := <-cl.messages:
 			fmt.Fprintln(conn, msg.String())
-		case <-r.close:
+		case <-cl.done:
 			return
 		}
 	}

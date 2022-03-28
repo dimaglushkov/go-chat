@@ -22,7 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ButlerClient interface {
-	CreateRoom(ctx context.Context, in *RoomName, opts ...grpc.CallOption) (*RoomPort, error)
+	CreateRoom(ctx context.Context, in *RoomNameSize, opts ...grpc.CallOption) (*RoomPort, error)
 	FindRoom(ctx context.Context, in *RoomName, opts ...grpc.CallOption) (*RoomPort, error)
 }
 
@@ -34,7 +34,7 @@ func NewButlerClient(cc grpc.ClientConnInterface) ButlerClient {
 	return &butlerClient{cc}
 }
 
-func (c *butlerClient) CreateRoom(ctx context.Context, in *RoomName, opts ...grpc.CallOption) (*RoomPort, error) {
+func (c *butlerClient) CreateRoom(ctx context.Context, in *RoomNameSize, opts ...grpc.CallOption) (*RoomPort, error) {
 	out := new(RoomPort)
 	err := c.cc.Invoke(ctx, "/chat.Butler/CreateRoom", in, out, opts...)
 	if err != nil {
@@ -56,7 +56,7 @@ func (c *butlerClient) FindRoom(ctx context.Context, in *RoomName, opts ...grpc.
 // All implementations must embed UnimplementedButlerServer
 // for forward compatibility
 type ButlerServer interface {
-	CreateRoom(context.Context, *RoomName) (*RoomPort, error)
+	CreateRoom(context.Context, *RoomNameSize) (*RoomPort, error)
 	FindRoom(context.Context, *RoomName) (*RoomPort, error)
 	mustEmbedUnimplementedButlerServer()
 }
@@ -65,7 +65,7 @@ type ButlerServer interface {
 type UnimplementedButlerServer struct {
 }
 
-func (UnimplementedButlerServer) CreateRoom(context.Context, *RoomName) (*RoomPort, error) {
+func (UnimplementedButlerServer) CreateRoom(context.Context, *RoomNameSize) (*RoomPort, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateRoom not implemented")
 }
 func (UnimplementedButlerServer) FindRoom(context.Context, *RoomName) (*RoomPort, error) {
@@ -85,7 +85,7 @@ func RegisterButlerServer(s grpc.ServiceRegistrar, srv ButlerServer) {
 }
 
 func _Butler_CreateRoom_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RoomName)
+	in := new(RoomNameSize)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -97,7 +97,7 @@ func _Butler_CreateRoom_Handler(srv interface{}, ctx context.Context, dec func(i
 		FullMethod: "/chat.Butler/CreateRoom",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ButlerServer).CreateRoom(ctx, req.(*RoomName))
+		return srv.(ButlerServer).CreateRoom(ctx, req.(*RoomNameSize))
 	}
 	return interceptor(ctx, in, info, handler)
 }

@@ -6,7 +6,7 @@ import (
 	"sync"
 )
 
-const roomSize = 20
+const maxRoomSize = 99
 
 type Butler struct {
 	ButlerServer
@@ -19,7 +19,14 @@ func NewButler() (butler Butler) {
 	return
 }
 
-func (b *Butler) CreateRoom(ctx context.Context, roomName *RoomName) (*RoomPort, error) {
+func (b *Butler) CreateRoom(ctx context.Context, roomNameSize *RoomNameSize) (*RoomPort, error) {
+	var roomSize int
+	if roomNameSize.Size <= 0 || roomNameSize.Size > maxRoomSize {
+		roomSize = maxRoomSize
+	} else {
+		roomSize = int(roomNameSize.Size)
+	}
+
 	cr, err := newRoom(roomSize)
 	if err != nil {
 		return &RoomPort{Port: 0, Exists: false}, err
@@ -27,17 +34,17 @@ func (b *Butler) CreateRoom(ctx context.Context, roomName *RoomName) (*RoomPort,
 	roomPort := int32(cr.getPort())
 
 	go func() {
-		log.Printf("creating room \"%s\" at port %d\n", roomName.Name, roomPort)
+		log.Printf("creating room \"%s\" at port %d\n", roomNameSize.Name, roomPort)
 		b.mu.Lock()
-		b.rooms[roomName.Name] = roomPort
+		b.rooms[roomNameSize.Name] = roomPort
 		b.mu.Unlock()
 
 		cr.Open()
 
 		b.mu.Lock()
-		delete(b.rooms, roomName.Name)
+		delete(b.rooms, roomNameSize.Name)
 		b.mu.Unlock()
-		log.Printf("room \"%s\" at port %d\n closed successfully", roomName.Name, roomPort)
+		log.Printf("room \"%s\" at port %d closed successfully", roomNameSize.Name, roomPort)
 	}()
 	return &RoomPort{Port: roomPort, Exists: true}, nil
 }

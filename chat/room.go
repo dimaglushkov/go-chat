@@ -115,6 +115,7 @@ func (r *room) handleConn(conn net.Conn) {
 	defer func() { <-r.sema }()
 	defer conn.Close()
 
+	log.Printf("new connection in room %d\n", r.getPort())
 	input := bufio.NewScanner(conn)
 	cl := client{}
 	cl.addr = conn.RemoteAddr().String()
@@ -123,6 +124,7 @@ func (r *room) handleConn(conn net.Conn) {
 	input.Scan()
 	cl.name = input.Text()
 
+	log.Printf("new connection in room %d is %s", r.getPort(), cl.name)
 	go r.messageWriter(conn, cl)
 
 	r.toEnter <- cl

@@ -1,13 +1,14 @@
 package app
 
 import (
+	"bufio"
 	"context"
-	"fmt"
 	"github.com/dimaglushkov/go-chat/chat"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"google.golang.org/grpc"
 	"log"
+	"net"
 	"os"
 	"strconv"
 	"sync"
@@ -15,23 +16,32 @@ import (
 )
 
 type Application struct {
-	App           *tview.Application
-	pagesMu       sync.Mutex
-	pages         *tview.Pages
-	Addr          serverAddr
+	App          *tview.Application
+	pages        *tview.Pages
+	pageBuilders map[string]func() tview.Primitive
+	Addr         serverAddr
+
 	butler        chat.ButlerClient
 	butlerCon     *grpc.ClientConn
 	grpcConnector func(addr, port string) (chat.ButlerClient, *grpc.ClientConn, error)
-	cc            ChatConn
-	tcpConnector  func(addr, port string) (ChatConn, error)
-	rns           chat.RoomNameSize
-	action        string
-	roomPort      *chat.RoomPort
+
+	tcpClient    *net.TCPConn
+	tcpConnector func(addr, port string) (*net.TCPConn, error)
+	rns          chat.RoomNameSize
+
+	roomPort *chat.RoomPort
+	action   string
+	username string
+
+	msgSender   *bufio.Writer
+	msgReceiver *bufio.Scanner
+	msgCnt      int
+	msgCntLock  sync.Mutex
 }
 
 func NewApp(
 	grpcConnector func(addr, port string) (chat.ButlerClient, *grpc.ClientConn, error),
-	tcpConnector func(addr, port string) (ChatConn, error),
+	tcpConnector func(addr, port string) (*net.TCPConn, error),
 ) *Application {
 	app := Application{}
 
@@ -41,34 +51,43 @@ func NewApp(
 	app.App = tview.NewApplication()
 	app.App.EnableMouse(true)
 	app.App.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyCtrlQ {
-			app.App.Stop()
+		if event.Key() == tcell.KeyCtrlQ || event.Key() == tcell.KeyCtrlC {
+			app.Stop()
 		}
 		return event
 	})
 
 	app.pages = tview.NewPages()
-	app.initLoadingPage()
-	app.initLobbyPage()
-	app.initAddrPage()
+	app.pageBuilders = map[string]func() tview.Primitive{
+		"loadingPage": app.newLoadingPage,
+		"addrPage":    app.newAddrPage,
+		"lobbyPage":   app.newLobbyPage,
+		"chatPage":    app.newChatPage,
+	}
+
+	for pageName, pageFunc := range app.pageBuilders {
+		if pageName != "chatPage" {
+			app.pages.AddPage(pageName, pageFunc(), true, false)
+		}
+	}
+	app.pages.ShowPage("addrPage")
 
 	app.App.SetRoot(app.pages, true)
 	return &app
 }
 
-func (app *Application) Stop(msg string) {
-	app.App.Stop()
-	if app.cc != nil {
+func (app *Application) Stop() {
+	if app.tcpClient != nil {
+		app.tcpClient.Close()
+	}
+	if app.butlerCon != nil {
 		app.butlerCon.Close()
 	}
-	if app.cc != nil {
-		app.cc.Close()
-	}
-	log.Print(msg)
+	app.App.Stop()
 	os.Exit(0)
 }
 
-func (app *Application) initAddrPage() {
+func (app *Application) newAddrPage() tview.Primitive {
 	addrPage := tview.NewForm().
 		AddInputField("IP Addr", "", 25, nil, func(text string) {
 			app.Addr.ipAddr = text
@@ -81,7 +100,7 @@ func (app *Application) initAddrPage() {
 				return
 			}
 			if app.grpcConnector == nil {
-				app.Stop("no grpc was provided to app")
+				app.Stop()
 			}
 			go app.load("lobbyPage", "addrPage", func() (err error) {
 				app.butler, app.butlerCon, err = app.grpcConnector(app.Addr.ipAddr, app.Addr.port)
@@ -94,11 +113,20 @@ func (app *Application) initAddrPage() {
 	addrPage.SetTitle("Server address").
 		SetBorder(true)
 
-	app.pages.AddPage("addrPage", center(40, 9, addrPage), true, true)
+	return center(40, 9, addrPage)
 }
 
-func (app *Application) initLobbyPage() {
+func (app *Application) newLobbyPage() tview.Primitive {
 	lobbyPage := tview.NewForm()
+	lobbyPage.AddInputField("user name", "", 20, func(text string, r rune) bool {
+		if len(text) > 20 {
+			return false
+		}
+		return true
+	}, func(text string) {
+		app.username = text
+	})
+
 	lobbyPage.AddInputField("room name", "", 20, func(text string, r rune) bool {
 		if len(text) > 10 {
 			return false
@@ -135,27 +163,24 @@ func (app *Application) initLobbyPage() {
 	})
 
 	lobbyPage.AddButton("Submit", func() {
-		if app.tcpConnector == nil {
-			app.Stop("no tcp was provided to app")
+		if app.tcpConnector == nil || len(app.username) < 2 {
+			app.Stop()
 		}
 
 		var err error
 		if app.action == "create" {
 			app.roomPort, err = app.butler.CreateRoom(context.Background(), &app.rns)
 			if err != nil || app.roomPort == nil {
-				log.Print("Room was not created: " + err.Error())
 				return
 			}
 		} else if app.action == "join" {
 			app.roomPort, err = app.butler.FindRoom(context.Background(), &chat.RoomName{Name: app.rns.Name})
 			if err != nil || app.roomPort == nil {
-				log.Print("Room was not found")
 				return
 			}
 		}
-		log.Print("Room found / created successfully")
 		go app.load("chatPage", "lobbyPage", func() error {
-			app.cc, err = app.tcpConnector(app.Addr.ipAddr, fmt.Sprint(app.roomPort.Port))
+			app.tcpClient, err = app.tcpConnector(app.Addr.ipAddr, strconv.FormatInt(int64(app.roomPort.Port), 10))
 			return err
 		})
 
@@ -167,13 +192,13 @@ func (app *Application) initLobbyPage() {
 	lobbyPage.SetTitle("Connect or create a room").
 		SetBorder(true)
 
-	app.pages.AddPage("lobbyPage", center(38, 11, lobbyPage), true, false)
+	return center(38, 13, lobbyPage)
 }
 
-func (app *Application) initLoadingPage() {
+func (app *Application) newLoadingPage() tview.Primitive {
 	loadingPage := tview.NewModal().
 		SetText("Loading")
-	app.pages.AddPage("loadingPage", loadingPage, true, false)
+	return loadingPage
 }
 
 func (app *Application) load(nextPageName, fallbackPageName string, f func() error) {
@@ -187,7 +212,100 @@ func (app *Application) load(nextPageName, fallbackPageName string, f func() err
 		})
 		return
 	}
+	if !app.pages.HasPage(nextPageName) {
+		app.pages.AddPage(nextPageName, app.pageBuilders[nextPageName](), true, false)
+	}
 	app.App.QueueUpdateDraw(func() {
 		app.pages.SwitchToPage(nextPageName)
 	})
+}
+
+func (app *Application) sendMsg(msg string) {
+	if app.msgSender == nil {
+		log.Println("app.msgSender is nil")
+		return
+	}
+	if len(msg) == 0 {
+		log.Println("msg is empty")
+		return
+	}
+	if msg[len(msg)-1] != '\n' {
+		msg += "\n"
+	}
+	_, err := app.msgSender.WriteString(msg)
+	if err != nil {
+		log.Println(err)
+	}
+	err = app.msgSender.Flush()
+	if err != nil {
+		log.Println(err)
+	}
+}
+
+func (app *Application) receiveMsg(msgTable *tview.Table) {
+	if app.msgReceiver == nil {
+		log.Println("app.msgReceiver is nil")
+		return
+	}
+	for app.msgReceiver.Scan() {
+		msgText := app.msgReceiver.Text()
+
+		app.msgCntLock.Lock()
+		msgTable.SetCell(app.msgCnt, 0, &tview.TableCell{Text: msgText})
+		app.msgCnt++
+		app.msgCntLock.Unlock()
+
+		app.App.Draw()
+	}
+
+}
+
+func (app *Application) newChatPage() tview.Primitive {
+	app.msgSender = bufio.NewWriter(app.tcpClient)
+	app.msgReceiver = bufio.NewScanner(app.tcpClient)
+
+	newPrimitive := func() tview.Primitive {
+		return tview.NewFrame(nil).
+			SetBorders(0, 0, 0, 0, 0, 0)
+	}
+
+	leftSideBar := newPrimitive()
+	rightSideBar := newPrimitive()
+	msgTable := tview.NewTable()
+	msgTable.
+		SetTitle("Chat room: " + app.rns.Name).
+		SetTitleColor(tcell.ColorGreenYellow).
+		SetBorder(false)
+	msgInputField := tview.NewInputField()
+	msgInputField.SetDoneFunc(func(key tcell.Key) {
+		msgText := msgInputField.GetText()
+		app.sendMsg(msgText)
+
+		app.msgCntLock.Lock()
+		msgTable.SetCell(app.msgCnt, 0, &tview.TableCell{Text: "me: " + msgText})
+		app.msgCnt++
+		app.msgCntLock.Unlock()
+
+		msgInputField.SetText("")
+	})
+
+	chatPage := tview.NewGrid().
+		SetRows(1, 0, 3).
+		SetColumns(0, -4, 0).
+		SetBorders(true).
+		AddItem(msgInputField, 2, 1, 1, 1, 0, 0, true)
+
+	chatPage.AddItem(leftSideBar, 0, 0, 0, 0, 0, 0, false).
+		AddItem(msgTable, 1, 0, 1, 3, 0, 0, false).
+		AddItem(rightSideBar, 0, 0, 0, 0, 0, 0, false)
+
+	// Layout for screens wider than 100 cells.
+	chatPage.AddItem(leftSideBar, 1, 0, 1, 1, 0, 100, false).
+		AddItem(msgTable, 1, 1, 1, 1, 0, 100, false).
+		AddItem(rightSideBar, 1, 2, 1, 1, 0, 100, false)
+
+	app.sendMsg(app.username)
+	go app.receiveMsg(msgTable)
+
+	return chatPage
 }

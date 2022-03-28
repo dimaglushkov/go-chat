@@ -5,24 +5,6 @@ import (
 	"strconv"
 )
 
-type chatConn struct {
-	net.Conn
-	done chan any
-}
-
-func (cc chatConn) Ch() chan any {
-	return cc.done
-}
-
-type ChatConn interface {
-	net.Conn
-	Ch() chan any
-}
-
-func NewChatConn(con net.Conn) ChatConn {
-	return &chatConn{con, make(chan any)}
-}
-
 type serverAddr struct {
 	ipAddr, port string
 }
@@ -36,3 +18,22 @@ func (addr serverAddr) validate() bool {
 	}
 	return true
 }
+
+/*
+func chatter(conn ChatConn, username string) {
+	done := conn.Ch()
+	conn.Write([]byte(username))
+	go func() {
+		io.Copy(os.Stdout, conn)
+		done <- struct{}{}
+	}()
+	mustCopy(conn, os.Stdin)
+	conn.Close()
+	<-done
+}
+
+func mustCopy(dst io.Writer, src io.Reader) {
+	if _, err := io.Copy(dst, src); err != nil {
+		log.Fatal(err)
+	}
+}*/

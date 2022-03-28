@@ -27,20 +27,15 @@ func grpcConnector(addr, port string) (chat.ButlerClient, *grpc.ClientConn, erro
 	if err != nil {
 		return nil, nil, err
 	}
-	return chat.NewButlerClient(conn), nil, nil
+	return chat.NewButlerClient(conn), conn, nil
 }
 
-func tcpConnector(addr, port string) (app.ChatConn, error) {
-	conn, err := net.Dial("tcp", addr+":"+port)
+func tcpConnector(addr, port string) (*net.TCPConn, error) {
+	tcpAddr, _ := net.ResolveTCPAddr("tcp", addr+":"+port)
+	conn, err := net.DialTCP("tcp", nil, tcpAddr)
+
 	if err != nil {
 		return nil, err
 	}
-	return app.NewChatConn(conn), nil
+	return conn, nil
 }
-
-/*
-func tcpConnector() {
-	roomNameSize := chat.RoomNameSize{Name: "kappa", Size: 2}
-	roomPort, err := c.CreateRoom(context.Background(), &roomNameSize)
-}
-*/

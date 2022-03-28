@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/dimaglushkov/go-chat/server/chat"
+	chat2 "github.com/dimaglushkov/go-chat/chat"
 	"google.golang.org/grpc"
 	"log"
 	"net"
@@ -13,9 +13,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	butler := chat.NewButler()
+	butler := chat2.NewButler()
 	grpcServer := grpc.NewServer()
-	chat.RegisterButlerServer(grpcServer, &butler)
+	chat2.RegisterButlerServer(grpcServer, &butler)
 
 	if err := grpcServer.Serve(listener); err != nil {
 		log.Fatal(err)

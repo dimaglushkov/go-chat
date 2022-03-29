@@ -240,7 +240,7 @@ func (app *Application) newChatPage() tview.Primitive {
 	msgTable.
 		SetTitle("Chat room: " + app.rns.Name).
 		SetTitleColor(tcell.ColorGreenYellow).
-		SetBorder(false)
+		SetBorder(true)
 	msgInputField := tview.NewInputField()
 	msgInputField.SetDoneFunc(func(key tcell.Key) {
 		text := msgInputField.GetText()
@@ -269,7 +269,7 @@ func (app *Application) newChatPage() tview.Primitive {
 	chatPage := tview.NewGrid().
 		SetRows(1, 0, 3).
 		SetColumns(0, -4, 0).
-		SetBorders(true).
+		SetBorders(false).
 		AddItem(msgInputField, 2, 1, 1, 1, 0, 0, true).
 		AddItem(leaveButton, 0, 1, 1, 1, 0, 0, false)
 

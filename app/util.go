@@ -1,9 +1,7 @@
 package app
 
 import (
-	"fmt"
 	"github.com/rivo/tview"
-	"time"
 )
 
 func center(width, height int, p tview.Primitive) tview.Primitive {
@@ -17,11 +15,7 @@ func center(width, height int, p tview.Primitive) tview.Primitive {
 		AddItem(nil, 0, 1, false)
 }
 
-func spinner() {
-	for {
-		for _, r := range `-\|/` {
-			fmt.Printf("\r%c", r)
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
+func newPrimitive() tview.Primitive {
+	return tview.NewFrame(nil).
+		SetBorders(0, 0, 0, 0, 0, 0)
 }

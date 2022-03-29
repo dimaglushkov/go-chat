@@ -1,6 +1,9 @@
 package app
 
 import (
+	"bufio"
+	"errors"
+	"log"
 	"net"
 	"strconv"
 )
@@ -19,21 +22,32 @@ func (addr serverAddr) validate() bool {
 	return true
 }
 
-/*
-func chatter(conn ChatConn, username string) {
-	done := conn.Ch()
-	conn.Write([]byte(username))
-	go func() {
-		io.Copy(os.Stdout, conn)
-		done <- struct{}{}
-	}()
-	mustCopy(conn, os.Stdin)
-	conn.Close()
-	<-done
+func sendMsg(sender *bufio.Writer, msg string) error {
+	if sender == nil {
+		return errors.New("app.msgSender is nil")
+	}
+	if len(msg) == 0 {
+		return errors.New("msg is empty")
+	}
+	if msg[len(msg)-1] != '\n' {
+		msg += "\n"
+	}
+	_, err := sender.WriteString(msg)
+	if err != nil {
+		return err
+	}
+	err = sender.Flush()
+	return err
 }
 
-func mustCopy(dst io.Writer, src io.Reader) {
-	if _, err := io.Copy(dst, src); err != nil {
-		log.Fatal(err)
+func receiveMsg(receiver *bufio.Scanner, printer func(string), done chan<- struct{}) {
+	if receiver == nil {
+		log.Println("receiver is nil")
+		return
 	}
-}*/
+	for receiver.Scan() {
+		msgText := receiver.Text()
+		printer(msgText)
+	}
+	done <- struct{}{}
+}

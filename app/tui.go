@@ -7,9 +7,7 @@ import (
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"google.golang.org/grpc"
-	"log"
 	"net"
-	"os"
 	"strconv"
 	"sync"
 	"unicode"
@@ -23,39 +21,43 @@ type Application struct {
 
 	butler        chat.ButlerClient
 	butlerCon     *grpc.ClientConn
-	grpcConnector func(addr, port string) (chat.ButlerClient, *grpc.ClientConn, error)
+	grpcConnector func(addr, port string) (*grpc.ClientConn, error)
 
 	tcpClient    *net.TCPConn
 	tcpConnector func(addr, port string) (*net.TCPConn, error)
-	rns          chat.RoomNameSize
 
+	rns      chat.RoomNameSize
 	roomPort *chat.RoomPort
 	action   string
 	username string
 
 	msgSender   *bufio.Writer
 	msgReceiver *bufio.Scanner
-	msgCnt      int
-	msgCntLock  sync.Mutex
+
+	msgChatCancel chan struct{}
+	msgRecDone    chan struct{}
+	msgLock       sync.Mutex
+	msgTable      *tview.Table
+	msgCnt        int
 }
 
 func NewApp(
-	grpcConnector func(addr, port string) (chat.ButlerClient, *grpc.ClientConn, error),
+	grpcConnector func(addr, port string) (*grpc.ClientConn, error),
 	tcpConnector func(addr, port string) (*net.TCPConn, error),
 ) *Application {
 	app := Application{}
-
 	app.grpcConnector = grpcConnector
 	app.tcpConnector = tcpConnector
+	app.msgRecDone = make(chan struct{})
 
-	app.App = tview.NewApplication()
-	app.App.EnableMouse(true)
-	app.App.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
-		if event.Key() == tcell.KeyCtrlQ || event.Key() == tcell.KeyCtrlC {
-			app.Stop()
-		}
-		return event
-	})
+	app.App = tview.NewApplication().
+		EnableMouse(true).
+		SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
+			if event.Key() == tcell.KeyCtrlQ || event.Key() == tcell.KeyCtrlC {
+				app.Stop()
+			}
+			return event
+		})
 
 	app.pages = tview.NewPages()
 	app.pageBuilders = map[string]func() tview.Primitive{
@@ -64,7 +66,6 @@ func NewApp(
 		"lobbyPage":   app.newLobbyPage,
 		"chatPage":    app.newChatPage,
 	}
-
 	for pageName, pageFunc := range app.pageBuilders {
 		if pageName != "chatPage" {
 			app.pages.AddPage(pageName, pageFunc(), true, false)
@@ -77,14 +78,13 @@ func NewApp(
 }
 
 func (app *Application) Stop() {
-	if app.tcpClient != nil {
-		app.tcpClient.Close()
-	}
+	app.closeChatPage()
 	if app.butlerCon != nil {
 		app.butlerCon.Close()
 	}
-	app.App.Stop()
-	os.Exit(0)
+	if app.App != nil {
+		app.App.Stop()
+	}
 }
 
 func (app *Application) newAddrPage() tview.Primitive {
@@ -103,7 +103,8 @@ func (app *Application) newAddrPage() tview.Primitive {
 				app.Stop()
 			}
 			go app.load("lobbyPage", "addrPage", func() (err error) {
-				app.butler, app.butlerCon, err = app.grpcConnector(app.Addr.ipAddr, app.Addr.port)
+				app.butlerCon, err = app.grpcConnector(app.Addr.ipAddr, app.Addr.port)
+				app.butler = chat.NewButlerClient(app.butlerCon)
 				return err
 			})
 		}).
@@ -220,54 +221,18 @@ func (app *Application) load(nextPageName, fallbackPageName string, f func() err
 	})
 }
 
-func (app *Application) sendMsg(msg string) {
-	if app.msgSender == nil {
-		log.Println("app.msgSender is nil")
-		return
-	}
-	if len(msg) == 0 {
-		log.Println("msg is empty")
-		return
-	}
-	if msg[len(msg)-1] != '\n' {
-		msg += "\n"
-	}
-	_, err := app.msgSender.WriteString(msg)
-	if err != nil {
-		log.Println(err)
-	}
-	err = app.msgSender.Flush()
-	if err != nil {
-		log.Println(err)
-	}
-}
-
-func (app *Application) receiveMsg(msgTable *tview.Table) {
-	if app.msgReceiver == nil {
-		log.Println("app.msgReceiver is nil")
-		return
-	}
-	for app.msgReceiver.Scan() {
-		msgText := app.msgReceiver.Text()
-
-		app.msgCntLock.Lock()
-		msgTable.SetCell(app.msgCnt, 0, &tview.TableCell{Text: msgText})
-		app.msgCnt++
-		app.msgCntLock.Unlock()
-
-		app.App.Draw()
-	}
-
+func (app *Application) printMsg(msgText string) {
+	app.msgLock.Lock()
+	app.App.QueueUpdateDraw(func() {
+		app.msgTable.SetCell(app.msgCnt, 0, &tview.TableCell{Text: msgText})
+	})
+	app.msgCnt++
+	app.msgLock.Unlock()
 }
 
 func (app *Application) newChatPage() tview.Primitive {
 	app.msgSender = bufio.NewWriter(app.tcpClient)
 	app.msgReceiver = bufio.NewScanner(app.tcpClient)
-
-	newPrimitive := func() tview.Primitive {
-		return tview.NewFrame(nil).
-			SetBorders(0, 0, 0, 0, 0, 0)
-	}
 
 	leftSideBar := newPrimitive()
 	rightSideBar := newPrimitive()
@@ -278,34 +243,60 @@ func (app *Application) newChatPage() tview.Primitive {
 		SetBorder(false)
 	msgInputField := tview.NewInputField()
 	msgInputField.SetDoneFunc(func(key tcell.Key) {
-		msgText := msgInputField.GetText()
-		app.sendMsg(msgText)
-
-		app.msgCntLock.Lock()
-		msgTable.SetCell(app.msgCnt, 0, &tview.TableCell{Text: "me: " + msgText})
-		app.msgCnt++
-		app.msgCntLock.Unlock()
-
+		text := msgInputField.GetText()
+		if len(text) == 0 {
+			return
+		}
+		err := sendMsg(app.msgSender, text)
+		if err != nil {
+			return
+		}
+		go app.printMsg("me: " + text)
 		msgInputField.SetText("")
 	})
+	msgTable.SetFocusFunc(func() {
+		msgInputField.Focus(nil)
+	})
+
+	leaveButton := tview.NewButton("Leave").
+		SetSelectedFunc(func() {
+			app.closeChatPage()
+			go app.App.QueueUpdateDraw(func() {
+				app.pages.SwitchToPage("lobbyPage")
+			})
+		})
 
 	chatPage := tview.NewGrid().
 		SetRows(1, 0, 3).
 		SetColumns(0, -4, 0).
 		SetBorders(true).
-		AddItem(msgInputField, 2, 1, 1, 1, 0, 0, true)
+		AddItem(msgInputField, 2, 1, 1, 1, 0, 0, true).
+		AddItem(leaveButton, 0, 1, 1, 1, 0, 0, false)
 
 	chatPage.AddItem(leftSideBar, 0, 0, 0, 0, 0, 0, false).
 		AddItem(msgTable, 1, 0, 1, 3, 0, 0, false).
 		AddItem(rightSideBar, 0, 0, 0, 0, 0, 0, false)
 
-	// Layout for screens wider than 100 cells.
 	chatPage.AddItem(leftSideBar, 1, 0, 1, 1, 0, 100, false).
 		AddItem(msgTable, 1, 1, 1, 1, 0, 100, false).
 		AddItem(rightSideBar, 1, 2, 1, 1, 0, 100, false)
 
-	app.sendMsg(app.username)
-	go app.receiveMsg(msgTable)
+	app.msgTable = msgTable
+	_ = sendMsg(app.msgSender, app.username)
+	go receiveMsg(app.msgReceiver, app.printMsg, app.msgRecDone)
 
 	return chatPage
+}
+
+func (app *Application) closeChatPage() {
+	if app.tcpClient != nil {
+		app.tcpClient.Close()
+	}
+	<-app.msgRecDone
+
+	app.msgLock.Lock()
+	app.msgCnt = 0
+	app.msgLock.Unlock()
+
+	app.pages.RemovePage("chatPage")
 }

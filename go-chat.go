@@ -2,7 +2,6 @@ package main
 
 import (
 	"github.com/dimaglushkov/go-chat/app"
-	"github.com/dimaglushkov/go-chat/chat"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
@@ -18,16 +17,16 @@ func main() {
 	}
 }
 
-func grpcConnector(addr, port string) (chat.ButlerClient, *grpc.ClientConn, error) {
+func grpcConnector(addr, port string) (*grpc.ClientConn, error) {
 	var conn *grpc.ClientConn
 	conn, err := grpc.Dial(addr+":"+port,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithBlock(),
 		grpc.WithTimeout(time.Second*3))
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
-	return chat.NewButlerClient(conn), conn, nil
+	return conn, nil
 }
 
 func tcpConnector(addr, port string) (*net.TCPConn, error) {

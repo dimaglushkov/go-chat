@@ -4,7 +4,7 @@
 // - protoc             v3.19.4
 // source: butler.proto
 
-package chat
+package server
 
 import (
 	context "context"
@@ -36,7 +36,7 @@ func NewButlerClient(cc grpc.ClientConnInterface) ButlerClient {
 
 func (c *butlerClient) CreateRoom(ctx context.Context, in *RoomNameSize, opts ...grpc.CallOption) (*RoomPort, error) {
 	out := new(RoomPort)
-	err := c.cc.Invoke(ctx, "/chat.Butler/CreateRoom", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/server.Butler/CreateRoom", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -45,7 +45,7 @@ func (c *butlerClient) CreateRoom(ctx context.Context, in *RoomNameSize, opts ..
 
 func (c *butlerClient) FindRoom(ctx context.Context, in *RoomName, opts ...grpc.CallOption) (*RoomPort, error) {
 	out := new(RoomPort)
-	err := c.cc.Invoke(ctx, "/chat.Butler/FindRoom", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/server.Butler/FindRoom", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -94,7 +94,7 @@ func _Butler_CreateRoom_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/chat.Butler/CreateRoom",
+		FullMethod: "/server.Butler/CreateRoom",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ButlerServer).CreateRoom(ctx, req.(*RoomNameSize))
@@ -112,7 +112,7 @@ func _Butler_FindRoom_Handler(srv interface{}, ctx context.Context, dec func(int
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/chat.Butler/FindRoom",
+		FullMethod: "/server.Butler/FindRoom",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ButlerServer).FindRoom(ctx, req.(*RoomName))
@@ -124,7 +124,7 @@ func _Butler_FindRoom_Handler(srv interface{}, ctx context.Context, dec func(int
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var Butler_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "chat.Butler",
+	ServiceName: "server.Butler",
 	HandlerType: (*ButlerServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

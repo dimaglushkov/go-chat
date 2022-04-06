@@ -1,23 +1,30 @@
 package main
 
 import (
-	chat2 "github.com/dimaglushkov/go-chat/chat"
+	"flag"
+	"github.com/dimaglushkov/go-chat/server"
 	"google.golang.org/grpc"
 	"log"
 	"net"
+	"strconv"
 )
 
 func main() {
-	listener, err := net.Listen("tcp", ":13002")
+	var err error
+	portFlag := flag.Int64("port", 0, "port number for app to run on")
+	flag.Parse()
+
+	listener, err := net.Listen("tcp", strconv.FormatInt(*portFlag, 10))
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	butler := chat2.NewButler()
+	butler := server.NewButler()
 	grpcServer := grpc.NewServer()
-	chat2.RegisterButlerServer(grpcServer, &butler)
+	server.RegisterButlerServer(grpcServer, &butler)
 
-	if err := grpcServer.Serve(listener); err != nil {
+	log.Printf("starting go-server-server listener on port %d\n", *portFlag)
+	if err = grpcServer.Serve(listener); err != nil {
 		log.Fatal(err)
 	}
 }

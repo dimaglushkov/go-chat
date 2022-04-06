@@ -4,7 +4,7 @@
 // 	protoc        v3.19.4
 // source: butler.proto
 
-package chat
+package server
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -215,15 +215,15 @@ func file_butler_proto_rawDescGZIP() []byte {
 
 var file_butler_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_butler_proto_goTypes = []interface{}{
-	(*RoomPort)(nil),     // 0: chat.RoomPort
-	(*RoomNameSize)(nil), // 1: chat.RoomNameSize
-	(*RoomName)(nil),     // 2: chat.RoomName
+	(*RoomPort)(nil),     // 0: server.RoomPort
+	(*RoomNameSize)(nil), // 1: server.RoomNameSize
+	(*RoomName)(nil),     // 2: server.RoomName
 }
 var file_butler_proto_depIdxs = []int32{
-	1, // 0: chat.Butler.CreateRoom:input_type -> chat.RoomNameSize
-	2, // 1: chat.Butler.FindRoom:input_type -> chat.RoomName
-	0, // 2: chat.Butler.CreateRoom:output_type -> chat.RoomPort
-	0, // 3: chat.Butler.FindRoom:output_type -> chat.RoomPort
+	1, // 0: server.Butler.CreateRoom:input_type -> server.RoomNameSize
+	2, // 1: server.Butler.FindRoom:input_type -> server.RoomName
+	0, // 2: server.Butler.CreateRoom:output_type -> server.RoomPort
+	0, // 3: server.Butler.FindRoom:output_type -> server.RoomPort
 	2, // [2:4] is the sub-list for method output_type
 	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name

@@ -3,7 +3,7 @@ package app
 import (
 	"bufio"
 	"context"
-	"github.com/dimaglushkov/go-chat/chat"
+	"github.com/dimaglushkov/go-chat/server"
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 	"google.golang.org/grpc"
@@ -14,20 +14,20 @@ import (
 )
 
 type Application struct {
-	App          *tview.Application
+	tviewApp     *tview.Application
 	pages        *tview.Pages
 	pageBuilders map[string]func() tview.Primitive
 	Addr         serverAddr
 
-	butler        chat.ButlerClient
+	butler        server.ButlerClient
 	butlerCon     *grpc.ClientConn
 	grpcConnector func(addr, port string) (*grpc.ClientConn, error)
 
 	tcpClient    *net.TCPConn
 	tcpConnector func(addr, port string) (*net.TCPConn, error)
 
-	rns      chat.RoomNameSize
-	roomPort *chat.RoomPort
+	rns      server.RoomNameSize
+	roomPort *server.RoomPort
 	action   string
 	username string
 
@@ -41,20 +41,17 @@ type Application struct {
 	msgCnt        int
 }
 
-func NewApp(
-	grpcConnector func(addr, port string) (*grpc.ClientConn, error),
-	tcpConnector func(addr, port string) (*net.TCPConn, error),
-) *Application {
+func New() *Application {
 	app := Application{}
 	app.grpcConnector = grpcConnector
 	app.tcpConnector = tcpConnector
 	app.msgRecDone = make(chan struct{})
 
-	app.App = tview.NewApplication().
+	app.tviewApp = tview.NewApplication().
 		EnableMouse(true).
 		SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 			if event.Key() == tcell.KeyCtrlQ || event.Key() == tcell.KeyCtrlC {
-				app.Stop()
+				app.stop()
 			}
 			return event
 		})
@@ -73,17 +70,21 @@ func NewApp(
 	}
 	app.pages.ShowPage("addrPage")
 
-	app.App.SetRoot(app.pages, true)
+	app.tviewApp.SetRoot(app.pages, true)
 	return &app
 }
 
-func (app *Application) Stop() {
+func (app *Application) Run() error {
+	return app.tviewApp.Run()
+}
+
+func (app *Application) stop() {
 	app.closeChatPage()
 	if app.butlerCon != nil {
 		app.butlerCon.Close()
 	}
-	if app.App != nil {
-		app.App.Stop()
+	if app.tviewApp != nil {
+		app.tviewApp.Stop()
 	}
 }
 
@@ -100,16 +101,16 @@ func (app *Application) newAddrPage() tview.Primitive {
 				return
 			}
 			if app.grpcConnector == nil {
-				app.Stop()
+				app.stop()
 			}
 			go app.load("lobbyPage", "addrPage", func() (err error) {
 				app.butlerCon, err = app.grpcConnector(app.Addr.ipAddr, app.Addr.port)
-				app.butler = chat.NewButlerClient(app.butlerCon)
+				app.butler = server.NewButlerClient(app.butlerCon)
 				return err
 			})
 		}).
 		AddButton("Quit", func() {
-			app.App.Stop()
+			app.tviewApp.Stop()
 		})
 	addrPage.SetTitle("Server address").
 		SetBorder(true)
@@ -165,7 +166,7 @@ func (app *Application) newLobbyPage() tview.Primitive {
 
 	lobbyPage.AddButton("Submit", func() {
 		if app.tcpConnector == nil || len(app.username) < 2 {
-			app.Stop()
+			app.stop()
 		}
 
 		var err error
@@ -175,7 +176,7 @@ func (app *Application) newLobbyPage() tview.Primitive {
 				return
 			}
 		} else if app.action == "join" {
-			app.roomPort, err = app.butler.FindRoom(context.Background(), &chat.RoomName{Name: app.rns.Name})
+			app.roomPort, err = app.butler.FindRoom(context.Background(), &server.RoomName{Name: app.rns.Name})
 			if err != nil || app.roomPort == nil {
 				return
 			}
@@ -187,7 +188,7 @@ func (app *Application) newLobbyPage() tview.Primitive {
 
 	})
 	lobbyPage.AddButton("Quit", func() {
-		app.App.Stop()
+		app.tviewApp.Stop()
 	})
 
 	lobbyPage.SetTitle("Connect or create a room").
@@ -203,12 +204,12 @@ func (app *Application) newLoadingPage() tview.Primitive {
 }
 
 func (app *Application) load(nextPageName, fallbackPageName string, f func() error) {
-	app.App.QueueUpdateDraw(func() {
+	app.tviewApp.QueueUpdateDraw(func() {
 		app.pages.SwitchToPage("loadingPage")
 	})
 	err := f()
 	if err != nil {
-		app.App.QueueUpdateDraw(func() {
+		app.tviewApp.QueueUpdateDraw(func() {
 			app.pages.SwitchToPage(fallbackPageName)
 		})
 		return
@@ -216,14 +217,14 @@ func (app *Application) load(nextPageName, fallbackPageName string, f func() err
 	if !app.pages.HasPage(nextPageName) {
 		app.pages.AddPage(nextPageName, app.pageBuilders[nextPageName](), true, false)
 	}
-	app.App.QueueUpdateDraw(func() {
+	app.tviewApp.QueueUpdateDraw(func() {
 		app.pages.SwitchToPage(nextPageName)
 	})
 }
 
 func (app *Application) printMsg(msgText string) {
 	app.msgLock.Lock()
-	app.App.QueueUpdateDraw(func() {
+	app.tviewApp.QueueUpdateDraw(func() {
 		app.msgTable.SetCell(app.msgCnt, 0, &tview.TableCell{Text: msgText})
 	})
 	app.msgCnt++
@@ -261,7 +262,7 @@ func (app *Application) newChatPage() tview.Primitive {
 	leaveButton := tview.NewButton("Leave").
 		SetSelectedFunc(func() {
 			app.closeChatPage()
-			go app.App.QueueUpdateDraw(func() {
+			go app.tviewApp.QueueUpdateDraw(func() {
 				app.pages.SwitchToPage("lobbyPage")
 			})
 		})

@@ -1,12 +1,12 @@
 package main
 
 import (
-	"github.com/dimaglushkov/go-chat/app"
+	"github.com/dimaglushkov/go-chat/chat"
 	"log"
 )
 
 func main() {
-	application := app.New()
+	application := chat.New()
 	if err := application.Run(); err != nil {
 		log.Fatal(err)
 	}

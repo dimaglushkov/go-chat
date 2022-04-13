@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"github.com/dimaglushkov/go-chat/server/rpc"
 	"golang.org/x/net/context"
 	"log"
 	"sync"
@@ -10,7 +11,7 @@ import (
 const maxRoomSize = 99
 
 type Butler struct {
-	ButlerServer
+	rpc.ButlerServer
 	mu    sync.RWMutex
 	rooms map[string]int32
 }
@@ -20,7 +21,7 @@ func NewButler() (butler Butler) {
 	return
 }
 
-func (b *Butler) CreateRoom(ctx context.Context, roomNameSize *RoomNameSize) (*RoomPort, error) {
+func (b *Butler) CreateRoom(ctx context.Context, roomNameSize *rpc.RoomNameSize) (*rpc.RoomPort, error) {
 	var roomSize int
 	if roomNameSize.Size <= 0 || roomNameSize.Size > maxRoomSize {
 		roomSize = maxRoomSize
@@ -28,12 +29,15 @@ func (b *Butler) CreateRoom(ctx context.Context, roomNameSize *RoomNameSize) (*R
 		roomSize = int(roomNameSize.Size)
 	}
 
-	if _, ok := b.rooms[roomNameSize.Name]; ok {
+	b.mu.RLock()
+	_, ok := b.rooms[roomNameSize.Name]
+	b.mu.RUnlock()
+	if ok {
 		return nil, fmt.Errorf("room \"%s\" already exists", roomNameSize.Name)
 	}
 	cr, err := newRoom(roomSize)
 	if err != nil {
-		return &RoomPort{Port: 0, Exists: false}, err
+		return &rpc.RoomPort{Port: 0, Exists: false}, err
 	}
 	roomPort := int32(cr.getPort())
 
@@ -50,12 +54,15 @@ func (b *Butler) CreateRoom(ctx context.Context, roomNameSize *RoomNameSize) (*R
 		b.mu.Unlock()
 		log.Printf("room \"%s\" at port %d closed successfully", roomNameSize.Name, roomPort)
 	}()
-	return &RoomPort{Port: roomPort, Exists: true}, nil
+	return &rpc.RoomPort{Port: roomPort, Exists: true}, nil
 }
 
-func (b *Butler) FindRoom(ctx context.Context, roomName *RoomName) (*RoomPort, error) {
+func (b *Butler) FindRoom(ctx context.Context, roomName *rpc.RoomName) (*rpc.RoomPort, error) {
 	b.mu.RLock()
-	roomPort := b.rooms[roomName.Name]
+	roomPort, ok := b.rooms[roomName.Name]
 	b.mu.RUnlock()
-	return &RoomPort{Port: roomPort, Exists: true}, nil
+	if !ok {
+		return nil, fmt.Errorf("room %s does not exist", roomName.Name)
+	}
+	return &rpc.RoomPort{Port: roomPort, Exists: true}, nil
 }

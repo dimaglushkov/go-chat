@@ -4,8 +4,6 @@
 *.dll
 *.so
 *.dylib
-go-chat-server
-go-chat
 
 
 # Test binary, built with `go test -c`

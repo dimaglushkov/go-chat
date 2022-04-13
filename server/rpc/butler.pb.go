@@ -4,7 +4,7 @@
 // 	protoc        v3.19.4
 // source: butler.proto
 
-package server
+package rpc
 
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
@@ -197,8 +197,8 @@ var file_butler_proto_rawDesc = []byte{
 	0x22, 0x00, 0x12, 0x2c, 0x0a, 0x08, 0x46, 0x69, 0x6e, 0x64, 0x52, 0x6f, 0x6f, 0x6d, 0x12, 0x0e,
 	0x2e, 0x63, 0x68, 0x61, 0x74, 0x2e, 0x52, 0x6f, 0x6f, 0x6d, 0x4e, 0x61, 0x6d, 0x65, 0x1a, 0x0e,
 	0x2e, 0x63, 0x68, 0x61, 0x74, 0x2e, 0x52, 0x6f, 0x6f, 0x6d, 0x50, 0x6f, 0x72, 0x74, 0x22, 0x00,
-	0x42, 0x09, 0x5a, 0x07, 0x2e, 0x2e, 0x2f, 0x63, 0x68, 0x61, 0x74, 0x62, 0x06, 0x70, 0x72, 0x6f,
-	0x74, 0x6f, 0x33,
+	0x42, 0x08, 0x5a, 0x06, 0x2e, 0x2e, 0x2f, 0x72, 0x70, 0x63, 0x62, 0x06, 0x70, 0x72, 0x6f, 0x74,
+	0x6f, 0x33,
 }
 
 var (
@@ -215,15 +215,15 @@ func file_butler_proto_rawDescGZIP() []byte {
 
 var file_butler_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_butler_proto_goTypes = []interface{}{
-	(*RoomPort)(nil),     // 0: server.RoomPort
-	(*RoomNameSize)(nil), // 1: server.RoomNameSize
-	(*RoomName)(nil),     // 2: server.RoomName
+	(*RoomPort)(nil),     // 0: chat.RoomPort
+	(*RoomNameSize)(nil), // 1: chat.RoomNameSize
+	(*RoomName)(nil),     // 2: chat.RoomName
 }
 var file_butler_proto_depIdxs = []int32{
-	1, // 0: server.Butler.CreateRoom:input_type -> server.RoomNameSize
-	2, // 1: server.Butler.FindRoom:input_type -> server.RoomName
-	0, // 2: server.Butler.CreateRoom:output_type -> server.RoomPort
-	0, // 3: server.Butler.FindRoom:output_type -> server.RoomPort
+	1, // 0: chat.Butler.CreateRoom:input_type -> chat.RoomNameSize
+	2, // 1: chat.Butler.FindRoom:input_type -> chat.RoomName
+	0, // 2: chat.Butler.CreateRoom:output_type -> chat.RoomPort
+	0, // 3: chat.Butler.FindRoom:output_type -> chat.RoomPort
 	2, // [2:4] is the sub-list for method output_type
 	0, // [0:2] is the sub-list for method input_type
 	0, // [0:0] is the sub-list for extension type_name

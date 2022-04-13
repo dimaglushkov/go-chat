@@ -1,4 +1,4 @@
-package app
+package chat
 
 import (
 	"bufio"
@@ -49,7 +49,7 @@ func tcpConnector(addr, port string) (*net.TCPConn, error) {
 
 func sendMsg(sender *bufio.Writer, msg string) error {
 	if sender == nil {
-		return errors.New("app.msgSender is nil")
+		return errors.New("chat.msgSender is nil")
 	}
 	if len(msg) == 0 {
 		return errors.New("msg is empty")

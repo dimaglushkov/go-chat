@@ -1,4 +1,4 @@
-package app
+package chat
 
 import (
 	"github.com/rivo/tview"

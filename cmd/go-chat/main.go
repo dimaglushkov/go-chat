@@ -1,8 +1,9 @@
 package main
 
 import (
-	"github.com/dimaglushkov/go-chat/chat"
 	"log"
+
+	"github.com/dimaglushkov/go-chat/internal/chat"
 )
 
 func main() {

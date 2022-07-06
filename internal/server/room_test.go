@@ -3,15 +3,17 @@ package server
 import (
 	"bufio"
 	"errors"
-	"github.com/dimaglushkov/go-chat/server/rpc"
-	"github.com/stretchr/testify/require"
 	"net"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
+
+	"github.com/dimaglushkov/go-chat/api/butlerpb"
 )
 
-func connectToRoom(rp *rpc.RoomPort) (*net.TCPConn, error) {
+func connectToRoom(rp *butlerpb.RoomPort) (*net.TCPConn, error) {
 	tcpAddr, _ := net.ResolveTCPAddr("tcp", "localhost:"+strconv.FormatInt(int64(rp.Port), 10))
 	return net.DialTCP("tcp", nil, tcpAddr)
 }
@@ -39,7 +41,7 @@ func sendMsg(sender *bufio.Writer, msg string) error {
 
 func TestRoom_Open(t *testing.T) {
 	var done = make(chan struct{})
-	r, err := newRoom(10)
+	r, err := NewRoom(10)
 	require.NoError(t, err)
 
 	go func() {
@@ -47,7 +49,7 @@ func TestRoom_Open(t *testing.T) {
 		done <- struct{}{}
 	}()
 
-	conn, err := connectToRoom(&rpc.RoomPort{Port: int32(r.getPort())})
+	conn, err := connectToRoom(&butlerpb.RoomPort{Port: int32(r.GetPort())})
 	require.NoError(t, err)
 
 	w := bufio.NewWriter(conn)

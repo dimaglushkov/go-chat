@@ -2,16 +2,18 @@ package server
 
 import (
 	"fmt"
-	"github.com/dimaglushkov/go-chat/server/rpc"
-	"golang.org/x/net/context"
 	"log"
 	"sync"
+
+	"golang.org/x/net/context"
+
+	"github.com/dimaglushkov/go-chat/api/butlerpb"
 )
 
 const maxRoomSize = 99
 
 type Butler struct {
-	rpc.ButlerServer
+	butlerpb.ButlerServer
 	mu    sync.RWMutex
 	rooms map[string]int32
 }
@@ -21,7 +23,7 @@ func NewButler() (butler Butler) {
 	return
 }
 
-func (b *Butler) CreateRoom(ctx context.Context, roomNameSize *rpc.RoomNameSize) (*rpc.RoomPort, error) {
+func (b *Butler) CreateRoom(ctx context.Context, roomNameSize *butlerpb.RoomNameSize) (*butlerpb.RoomPort, error) {
 	var roomSize int
 	if roomNameSize.Size <= 0 || roomNameSize.Size > maxRoomSize {
 		roomSize = maxRoomSize
@@ -35,11 +37,11 @@ func (b *Butler) CreateRoom(ctx context.Context, roomNameSize *rpc.RoomNameSize)
 	if ok {
 		return nil, fmt.Errorf("room \"%s\" already exists", roomNameSize.Name)
 	}
-	cr, err := newRoom(roomSize)
+	cr, err := NewRoom(roomSize)
 	if err != nil {
-		return &rpc.RoomPort{Port: 0, Exists: false}, err
+		return &butlerpb.RoomPort{Port: 0, Exists: false}, err
 	}
-	roomPort := int32(cr.getPort())
+	roomPort := int32(cr.GetPort())
 
 	go func() {
 		log.Printf("creating room \"%s\" at port %d\n", roomNameSize.Name, roomPort)
@@ -54,15 +56,15 @@ func (b *Butler) CreateRoom(ctx context.Context, roomNameSize *rpc.RoomNameSize)
 		b.mu.Unlock()
 		log.Printf("room \"%s\" at port %d closed successfully", roomNameSize.Name, roomPort)
 	}()
-	return &rpc.RoomPort{Port: roomPort, Exists: true}, nil
+	return &butlerpb.RoomPort{Port: roomPort, Exists: true}, nil
 }
 
-func (b *Butler) FindRoom(ctx context.Context, roomName *rpc.RoomName) (*rpc.RoomPort, error) {
+func (b *Butler) FindRoom(ctx context.Context, roomName *butlerpb.RoomName) (*butlerpb.RoomPort, error) {
 	b.mu.RLock()
 	roomPort, ok := b.rooms[roomName.Name]
 	b.mu.RUnlock()
 	if !ok {
 		return nil, fmt.Errorf("room %s does not exist", roomName.Name)
 	}
-	return &rpc.RoomPort{Port: roomPort, Exists: true}, nil
+	return &butlerpb.RoomPort{Port: roomPort, Exists: true}, nil
 }

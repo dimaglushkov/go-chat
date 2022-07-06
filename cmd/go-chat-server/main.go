@@ -3,13 +3,15 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/dimaglushkov/go-chat/server"
-	"github.com/dimaglushkov/go-chat/server/rpc"
-	"google.golang.org/grpc"
 	"log"
 	"net"
 	"os"
 	"strconv"
+
+	"google.golang.org/grpc"
+
+	"github.com/dimaglushkov/go-chat/api/butlerpb"
+	"github.com/dimaglushkov/go-chat/internal/server"
 )
 
 func run(port int64) error {
@@ -20,7 +22,7 @@ func run(port int64) error {
 
 	butler := server.NewButler()
 	grpcServer := grpc.NewServer()
-	rpc.RegisterButlerServer(grpcServer, &butler)
+	butlerpb.RegisterButlerServer(grpcServer, &butler)
 
 	log.Printf("starting go-server-server listener on port %d\n", port)
 	if err = grpcServer.Serve(listener); err != nil {

@@ -35,7 +35,7 @@ type room struct {
 	close    chan any
 }
 
-func newRoom(roomSize int) (r room, err error) {
+func NewRoom(roomSize int) (r room, err error) {
 	r = room{}
 	r.listener, err = net.Listen("tcp", ":0")
 	if err != nil {
@@ -50,7 +50,7 @@ func newRoom(roomSize int) (r room, err error) {
 	return
 }
 
-func (r *room) getPort() int {
+func (r *room) GetPort() int {
 	return r.listener.Addr().(*net.TCPAddr).Port
 }
 
@@ -97,7 +97,7 @@ func (r *room) roomMonitor() {
 			}
 
 			if len(r.clients) == 0 {
-				log.Printf("room at port %d is empty, closing it", r.getPort())
+				log.Printf("room at port %d is empty, closing it", r.GetPort())
 				err := r.listener.Close()
 				if err != nil {
 					log.Println(err)
@@ -114,7 +114,7 @@ func (r *room) handleConn(conn net.Conn) {
 	defer func() { <-r.sema }()
 	defer conn.Close()
 
-	log.Printf("new unnamed connection in room %d\n", r.getPort())
+	log.Printf("new unnamed connection in room %d\n", r.GetPort())
 	input := bufio.NewScanner(conn)
 	cl := client{}
 	cl.addr = conn.RemoteAddr().String()
@@ -123,7 +123,7 @@ func (r *room) handleConn(conn net.Conn) {
 	input.Scan()
 	cl.name = input.Text()
 
-	log.Printf("new unnamed connection in room %d is %s", r.getPort(), cl.name)
+	log.Printf("new unnamed connection in room %d is %s", r.GetPort(), cl.name)
 	go r.messageWriter(conn, cl)
 
 	r.toEnter <- cl

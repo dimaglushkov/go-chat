@@ -3,17 +3,18 @@ package server
 import (
 	"bufio"
 	"context"
-	"github.com/dimaglushkov/go-chat/server/rpc"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
+
+	"github.com/dimaglushkov/go-chat/api/butlerpb"
 )
 
 func TestButler_CreateRoomValid(t *testing.T) {
 	butler := NewButler()
 	ctx := context.Background()
-	rns := &rpc.RoomNameSize{
+	rns := &butlerpb.RoomNameSize{
 		Size: 1200,
 		Name: "testRoom",
 	}
@@ -33,10 +34,10 @@ func TestButler_CreateRoomValid(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestButler_FindRoom(t *testing.T) {
+/*func TestButler_FindRoom(t *testing.T) {
 	butler := NewButler()
 	ctx := context.Background()
-	rns := &rpc.RoomNameSize{
+	rns := &butlerpb.RoomNameSize{
 		Size: 20,
 		Name: "testRoom",
 	}
@@ -53,18 +54,18 @@ func TestButler_FindRoom(t *testing.T) {
 	err = w.Flush()
 	require.NoError(t, err)
 
-	r1, err := butler.FindRoom(ctx, &rpc.RoomName{Name: rns.Name})
+	r1, err := butler.FindRoom(ctx, &butlerpb.RoomName{Name: rns.Name})
 	require.NoError(t, err)
 	require.NotNil(t, r1)
 
-	r2, err := butler.FindRoom(ctx, &rpc.RoomName{Name: "_testName_"})
+	r2, err := butler.FindRoom(ctx, &butlerpb.RoomName{Name: "_testName_"})
 	require.Error(t, err)
 	require.Nil(t, r2)
 
 	conn.Close()
 	time.Sleep(3 * time.Second)
-	r1, err = butler.FindRoom(ctx, &rpc.RoomName{Name: rns.Name})
+	r1, err = butler.FindRoom(ctx, &butlerpb.RoomName{Name: rns.Name})
 	require.Error(t, err)
 	require.Nil(t, r1)
 
-}
+}*/

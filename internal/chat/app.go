@@ -3,14 +3,16 @@ package chat
 import (
 	"bufio"
 	"context"
-	"github.com/dimaglushkov/go-chat/server/rpc"
-	"github.com/gdamore/tcell/v2"
-	"github.com/rivo/tview"
-	"google.golang.org/grpc"
 	"net"
 	"strconv"
 	"sync"
 	"unicode"
+
+	"github.com/gdamore/tcell/v2"
+	"github.com/rivo/tview"
+	"google.golang.org/grpc"
+
+	"github.com/dimaglushkov/go-chat/api/butlerpb"
 )
 
 type Application struct {
@@ -19,15 +21,15 @@ type Application struct {
 	pageBuilders map[string]func() tview.Primitive
 	Addr         serverAddr
 
-	butler        rpc.ButlerClient
+	butler        butlerpb.ButlerClient
 	butlerCon     *grpc.ClientConn
 	grpcConnector func(addr, port string) (*grpc.ClientConn, error)
 
 	tcpClient    *net.TCPConn
 	tcpConnector func(addr, port string) (*net.TCPConn, error)
 
-	rns      rpc.RoomNameSize
-	roomPort *rpc.RoomPort
+	rns      butlerpb.RoomNameSize
+	roomPort *butlerpb.RoomPort
 	action   string
 	username string
 
@@ -105,7 +107,7 @@ func (app *Application) newAddrPage() tview.Primitive {
 			}
 			go app.load("lobbyPage", "addrPage", func() (err error) {
 				app.butlerCon, err = app.grpcConnector(app.Addr.ipAddr, app.Addr.port)
-				app.butler = rpc.NewButlerClient(app.butlerCon)
+				app.butler = butlerpb.NewButlerClient(app.butlerCon)
 				return err
 			})
 		}).
@@ -176,7 +178,7 @@ func (app *Application) newLobbyPage() tview.Primitive {
 				return
 			}
 		} else if app.action == "join" {
-			app.roomPort, err = app.butler.FindRoom(context.Background(), &rpc.RoomName{Name: app.rns.Name})
+			app.roomPort, err = app.butler.FindRoom(context.Background(), &butlerpb.RoomName{Name: app.rns.Name})
 			if err != nil || app.roomPort == nil {
 				return
 			}
